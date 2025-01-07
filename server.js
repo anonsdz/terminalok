@@ -5,7 +5,8 @@ const http = require('http');
 const pty = require('node-pty');
 const axios = require('axios');
 const cors = require('cors');
-const moment = require('moment-timezone');  // Thêm thư viện moment-timezone để lấy giờ VN
+const moment = require('moment-timezone');
+const os = require('os-utils');  // Thêm thư viện os-utils
 
 // Tạo ứng dụng Express
 const app = express();
@@ -104,6 +105,22 @@ io.on('connection', async (socket) => {
     shell.kill();
     delete sessions[socket.id];
   });
+
+  // Gửi thông số hệ thống mỗi giây
+  setInterval(() => {
+    // Lấy thông số CPU
+    os.cpuUsage(function (v) {
+      socket.emit('systemInfo', { type: 'cpu', value: (v * 100).toFixed(2) });
+    });
+
+    // Lấy thông số RAM
+    os.totalmem(function (totalMem) {
+      os.freemem(function (freeMem) {
+        const usedMem = totalMem - freeMem;
+        socket.emit('systemInfo', { type: 'ram', value: ((usedMem / totalMem) * 100).toFixed(2) });
+      });
+    });
+  }, 1000);  // Cập nhật mỗi giây
 });
 
 // Lấy port từ môi trường hoặc mặc định port 3000
