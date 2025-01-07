@@ -7,19 +7,51 @@
   <title>Ubuntu Terminal Web</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     html,
     body {
       height: 100%;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
       background-color: #1e1e1e;
       color: #fff;
       font-family: 'Ubuntu', sans-serif;
       overflow: hidden;
-      background: url('https://res.cloudinary.com/canonical/image/fetch/f_auto,q_auto,fl_sanitize,w_1801,h_954/https://assets.ubuntu.com/v1/622b4fe1-numpy-numbat-on-dell-xps-13.jpg') center/cover no-repeat;
-      background-size: cover;
-      background-position: center;
+      display: flex;
+      flex-direction: row;
+    }
+
+    /* Container for terminal, htop, and speedtest */
+    .container {
+      display: flex;
+      flex: 1;
+      height: 100%;
+    }
+
+    /* Terminal */
+    #terminal-container {
+      flex: 2;
+      height: 100%;
+      background: #282c34;
+    }
+
+    /* Left panel (htop) */
+    #htop-container {
+      flex: 1;
+      height: 100%;
+      background-color: #333;
+      overflow: auto;
+    }
+
+    /* Right panel (speedtest) */
+    #speedtest-container {
+      flex: 1;
+      height: 100%;
+      background-color: #333;
+      overflow: auto;
     }
 
     /* Phần đăng nhập */
@@ -73,20 +105,6 @@
       display: none;
     }
 
-    /* Phần Terminal */
-    #terminal-container {
-      display: none;
-      width: 100%;
-      height: 100%; /* Đảm bảo terminal chiếm hết chiều cao màn hình */
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 1;
-    }
-
     /* Media Query cho các thiết bị di động */
     @media (max-width: 600px) {
       .login-container {
@@ -112,9 +130,7 @@
 
   <!-- Phần đăng nhập -->
   <div class="login-container" id="loginContainer">
-    <img
-      src="https://cdn.shortpixel.ai/spai/q_lossy+ret_img+to_auto/linuxiac.com/wp-content/uploads/2022/03/ubuntu-logo.png"
-      alt="Ubuntu Logo">
+    <img src="https://cdn.shortpixel.ai/spai/q_lossy+ret_img+to_auto/linuxiac.com/wp-content/uploads/2022/03/ubuntu-logo.png" alt="Ubuntu Logo">
     <h2>Login</h2>
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
@@ -122,8 +138,21 @@
     <div class="loading-message" id="loadingMessage">Vui lòng đợi, đang kết nối đến SSH console...</div>
   </div>
 
-  <!-- Phần terminal sẽ ẩn đi khi chưa đăng nhập -->
-  <div id="terminal-container"></div>
+  <!-- Phần container cho terminal, htop và speedtest -->
+  <div class="container" id="container" style="display: none;">
+    <!-- Terminal -->
+    <div id="terminal-container"></div>
+
+    <!-- Htop container -->
+    <div id="htop-container">
+      <pre id="htop-output">Loading htop...</pre>
+    </div>
+
+    <!-- Speedtest container -->
+    <div id="speedtest-container">
+      <pre id="speedtest-output">Loading speedtest...</pre>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.js"></script>
@@ -131,18 +160,18 @@
     let terminal; // Khai báo biến terminal toàn cục để chỉ khởi tạo sau khi login
     let socket;
 
-    // Hàm khởi tạo terminal với chiều cao và chiều rộng tự động
+    // Hàm khởi tạo terminal
     function initializeTerminal() {
-      const width = window.innerWidth;   // Chiều rộng màn hình
-      const height = window.innerHeight; // Chiều cao màn hình
-      const cols = Math.floor(width / 10); // Tính số cột (1 cột = 10px, giảm kích thước mỗi ô)
-      const rows = Math.floor(height / 18); // Tính số dòng (1 dòng = 18px, giảm chiều cao ô)
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const cols = Math.floor(width / 12);
+      const rows = Math.floor(height / 20);
 
       terminal = new Terminal({
-        rows: rows, // Số dòng tự động
-        cols: cols, // Số cột tự động
+        rows: rows,
+        cols: cols,
         scrollback: 500,
-        theme: {background: '#282c34', foreground: '#fff'}
+        theme: { background: '#282c34', foreground: '#fff' }
       });
 
       terminal.open(document.getElementById('terminal-container'));
@@ -152,13 +181,13 @@
       socket.on('output', data => terminal.write(data));
     }
 
+    // Hàm đăng nhập
     function login() {
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       const loadingMessage = document.getElementById('loadingMessage');
       loadingMessage.style.display = 'block';
 
-      // Kiểm tra thông tin đăng nhập
       if (username === 'negan' && password === 'negan') {
         simulateLoginProcess();
       } else {
@@ -173,23 +202,22 @@
       const steps = [
         'Connecting to server Singapore SSH linuxuser@139.180.188.174 port 22...',
         'Connection established Successfully.',
-        `Last login: ${new Date().toLocaleString('en-US', {timeZone: 'Asia/Ho_Chi_Minh'})}`
+        `Last login: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       ];
       const loadingMessage = document.getElementById('loadingMessage');
 
       let i = 0;
       loadingMessage.textContent = steps[i++];
-
-      setTimeout(() => {loadingMessage.textContent = steps[i++];}, 2000);
-      setTimeout(() => {loadingMessage.textContent = steps[i++];}, 4000);
+      setTimeout(() => { loadingMessage.textContent = steps[i++]; }, 2000);
+      setTimeout(() => { loadingMessage.textContent = steps[i++]; }, 4000);
 
       setTimeout(() => {
         loadingMessage.style.display = 'none';
         document.getElementById('loginContainer').style.display = 'none'; // Ẩn phần đăng nhập
-        document.getElementById('terminal-container').style.display = 'flex'; // Hiển thị terminal
-
-        // Khởi tạo và mở terminal
-        initializeTerminal();
+        document.getElementById('container').style.display = 'flex'; // Hiển thị terminal và các bảng
+        initializeTerminal(); // Khởi tạo terminal
+        startHtop();  // Khởi tạo htop
+        startSpeedtest(); // Khởi tạo speedtest
       }, 8000);
     }
 
@@ -197,11 +225,26 @@
     window.addEventListener('resize', function () {
       if (terminal) {
         terminal.resize(
-          Math.floor(window.innerWidth / 10),   // Tính lại số cột khi thay đổi kích thước
-          Math.floor(window.innerHeight / 18)   // Tính lại số dòng khi thay đổi kích thước
+          Math.floor(window.innerWidth / 12),
+          Math.floor(window.innerHeight / 20)
         );
       }
     });
+
+    // Hàm chạy htop
+    function startHtop() {
+      setInterval(() => {
+        socket.emit('command', 'htop -b -n 1');
+      }, 5000); // Cập nhật htop mỗi 5 giây
+    }
+
+    // Hàm chạy speedtest
+    function startSpeedtest() {
+      setInterval(() => {
+        socket.emit('command', 'speedtest-cli --simple');
+      }, 7000); // Cập nhật speedtest mỗi 7 giây
+    }
+
   </script>
 </body>
 
