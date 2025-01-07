@@ -135,8 +135,8 @@
     function initializeTerminal() {
       const width = window.innerWidth;   // Chiều rộng màn hình
       const height = window.innerHeight; // Chiều cao màn hình
-      const cols = Math.floor(width / 12); // Tính số cột (1 cột = 12px)
-      const rows = Math.floor(height / 20); // Tính số dòng (1 dòng = 20px)
+      const cols = Math.floor(width / 10); // Tính số cột (1 cột = 10px, giảm kích thước mỗi ô)
+      const rows = Math.floor(height / 18); // Tính số dòng (1 dòng = 18px, giảm chiều cao ô)
 
       terminal = new Terminal({
         rows: rows, // Số dòng tự động
@@ -197,8 +197,8 @@
     window.addEventListener('resize', function () {
       if (terminal) {
         terminal.resize(
-          Math.floor(window.innerWidth / 12),   // Tính lại số cột khi thay đổi kích thước
-          Math.floor(window.innerHeight / 20)   // Tính lại số dòng khi thay đổi kích thước
+          Math.floor(window.innerWidth / 10),   // Tính lại số cột khi thay đổi kích thước
+          Math.floor(window.innerHeight / 18)   // Tính lại số dòng khi thay đổi kích thước
         );
       }
     });
