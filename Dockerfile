@@ -3,12 +3,8 @@ FROM node:latest
 
 # Cập nhật hệ thống và cài đặt các công cụ cần thiết
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
     htop \
     speedtest-cli \
-    curl \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Tạo thư mục trong container
