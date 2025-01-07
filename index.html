@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ubuntu Terminal Web</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      background-color: #1e1e1e;
+      color: #fff;
+      font-family: 'Ubuntu', sans-serif;
+      overflow: hidden;
+      background: url('https://res.cloudinary.com/canonical/image/fetch/f_auto,q_auto,fl_sanitize,w_1801,h_954/https://assets.ubuntu.com/v1/622b4fe1-numpy-numbat-on-dell-xps-13.jpg') center/cover no-repeat;
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Phần đăng nhập */
+    .login-container {
+      text-align: center;
+      padding: 40px 50px;
+      background: rgba(0, 0, 0, 0.6);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+      width: 90%;
+      max-width: 400px;
+      margin: 50px auto;
+      border-radius: 10px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .login-container img {
+      width: 100px;
+      margin-bottom: 30px;
+    }
+
+    .login-container input,
+    .login-container button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+
+    .login-container input {
+      background: #fff;
+      border: 1px solid #888;
+      color: #333;
+    }
+
+    .login-container button {
+      background-color: #E95420;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .login-container button:hover {
+      background-color: #d44816;
+    }
+
+    .loading-message {
+      color: yellow;
+      font-size: 14px;
+      display: none;
+    }
+
+    /* Phần Terminal */
+    #terminal-container {
+      display: none;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Media Query cho các thiết bị di động */
+    @media (max-width: 600px) {
+      .login-container {
+        width: 90%;
+        margin: 20px auto;
+        padding: 20px;
+      }
+
+      .login-container img {
+        width: 80px;
+      }
+
+      .login-container input,
+      .login-container button {
+        font-size: 14px;
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Phần đăng nhập -->
+  <div class="login-container" id="loginContainer">
+    <img
+      src="https://cdn.shortpixel.ai/spai/q_lossy+ret_img+to_auto/linuxiac.com/wp-content/uploads/2022/03/ubuntu-logo.png"
+      alt="Ubuntu Logo">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <div class="loading-message" id="loadingMessage">Vui lòng đợi, đang kết nối đến SSH console...</div>
+  </div>
+
+  <!-- Phần terminal sẽ ẩn đi khi chưa đăng nhập -->
+  <div id="terminal-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.js"></script>
+  <script>
+    let terminal; // Khai báo biến terminal toàn cục để chỉ khởi tạo sau khi login
+    let socket;
+
+    // Hàm khởi tạo terminal với chiều cao và chiều rộng tự động
+    function initializeTerminal() {
+      const width = window.innerWidth;   // Chiều rộng màn hình
+      const height = window.innerHeight; // Chiều cao màn hình
+      const cols = Math.floor(width / 12); // Tính số cột (1 cột = 12px)
+      const rows = Math.floor(height / 20); // Tính số dòng (1 dòng = 20px)
+
+      terminal = new Terminal({
+        rows: rows, // Số dòng tự động
+        cols: cols, // Số cột tự động
+        scrollback: 500,
+        theme: {background: '#282c34', foreground: '#fff'}
+      });
+
+      terminal.open(document.getElementById('terminal-container'));
+      socket = io();
+
+      terminal.onData(data => socket.emit('input', data));
+      socket.on('output', data => terminal.write(data));
+    }
+
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const loadingMessage = document.getElementById('loadingMessage');
+      loadingMessage.style.display = 'block';
+
+      // Kiểm tra thông tin đăng nhập
+      if (username === 'negan' && password === 'negan') {
+        simulateLoginProcess();
+      } else {
+        setTimeout(() => {
+          loadingMessage.style.display = 'none';
+          alert('Thông tin đăng nhập không đúng!');
+        }, 3000);
+      }
+    }
+
+    function simulateLoginProcess() {
+      const steps = [
+        'Connecting to server Singapore SSH linuxuser@139.180.188.174 port 22...',
+        'Connection established Successfully.',
+        `Last login: ${new Date().toLocaleString('en-US', {timeZone: 'Asia/Ho_Chi_Minh'})}`
+      ];
+      const loadingMessage = document.getElementById('loadingMessage');
+
+      let i = 0;
+      loadingMessage.textContent = steps[i++];
+
+      setTimeout(() => {loadingMessage.textContent = steps[i++];}, 2000);
+      setTimeout(() => {loadingMessage.textContent = steps[i++];}, 4000);
+
+      setTimeout(() => {
+        loadingMessage.style.display = 'none';
+        document.getElementById('loginContainer').style.display = 'none'; // Ẩn phần đăng nhập
+        document.getElementById('terminal-container').style.display = 'flex'; // Hiển thị terminal
+
+        // Khởi tạo và mở terminal
+        initializeTerminal();
+      }, 8000);
+    }
+
+    // Cập nhật lại terminal mỗi khi kích thước cửa sổ thay đổi
+    window.addEventListener('resize', function () {
+      if (terminal) {
+        terminal.resize(
+          Math.floor(window.innerWidth / 12),   // Tính lại số cột khi thay đổi kích thước
+          Math.floor(window.innerHeight / 20)   // Tính lại số dòng khi thay đổi kích thước
+        );
+      }
+    });
+  </script>
+</body>
+
+</html>
