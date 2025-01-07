@@ -1,124 +1,251 @@
-const express = require('express');
-const path = require('path');
-const socketIo = require('socket.io');
-const http = require('http');
-const pty = require('node-pty');
-const axios = require('axios');
-const cors = require('cors');
-const moment = require('moment-timezone');  // Thêm thư viện moment-timezone để lấy giờ VN
+<!DOCTYPE html>
+<html lang="vi">
 
-// Tạo ứng dụng Express
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-
-// Cấu hình CORS
-app.use(cors());  // Cho phép tất cả các nguồn gốc
-
-// Cung cấp các tài nguyên tĩnh cho client (CSS, JS)
-app.use(express.static(path.join(__dirname)));
-
-// Cung cấp index.html khi truy cập trang chủ
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Lấy thông tin địa lý của người dùng từ IP
-async function getUserLocation(ip) {
-  try {
-    const response = await axios.get(`http://ip-api.com/json/${ip}`);
-    if (response.data.status === 'fail') {
-      return { ip: 'Unknown', country: 'Unknown', city: 'Unknown' };
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ubuntu Terminal Web</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    return {
-      ip: response.data.query,
-      country: response.data.country,
-      city: response.data.city,
-    };
-  } catch (error) {
-    console.error('Error fetching location for IP:', ip, error);
-    return { ip: 'Unknown', country: 'Unknown', city: 'Unknown' };
-  }
-}
 
-// Gửi thông tin đến bot Telegram
-async function sendToTelegram(message) {
-  const botToken = '8039598203:AAHEmboLSteoEIvu-bSnqFUVn7A6OgDQVr4';
-  const chatId = '7371969470'; // Thay thế bằng chat ID của bạn
+    html,
+    body {
+      height: 100%;
+      background-color: #1e1e1e;
+      color: #fff;
+      font-family: 'Ubuntu', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: row;
+    }
 
-  try {
-    const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      chat_id: chatId,
-      text: message,
+    /* Container for terminal, htop, and speedtest */
+    .container {
+      display: flex;
+      flex: 1;
+      height: 100%;
+    }
+
+    /* Terminal */
+    #terminal-container {
+      flex: 2;
+      height: 100%;
+      background: #282c34;
+    }
+
+    /* Left panel (htop) */
+    #htop-container {
+      flex: 1;
+      height: 100%;
+      background-color: #333;
+      overflow: auto;
+    }
+
+    /* Right panel (speedtest) */
+    #speedtest-container {
+      flex: 1;
+      height: 100%;
+      background-color: #333;
+      overflow: auto;
+    }
+
+    /* Phần đăng nhập */
+    .login-container {
+      text-align: center;
+      padding: 40px 50px;
+      background: rgba(0, 0, 0, 0.6);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+      width: 90%;
+      max-width: 400px;
+      margin: 50px auto;
+      border-radius: 10px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .login-container img {
+      width: 100px;
+      margin-bottom: 30px;
+    }
+
+    .login-container input,
+    .login-container button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+
+    .login-container input {
+      background: #fff;
+      border: 1px solid #888;
+      color: #333;
+    }
+
+    .login-container button {
+      background-color: #E95420;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .login-container button:hover {
+      background-color: #d44816;
+    }
+
+    .loading-message {
+      color: yellow;
+      font-size: 14px;
+      display: none;
+    }
+
+    /* Media Query cho các thiết bị di động */
+    @media (max-width: 600px) {
+      .login-container {
+        width: 90%;
+        margin: 20px auto;
+        padding: 20px;
+      }
+
+      .login-container img {
+        width: 80px;
+      }
+
+      .login-container input,
+      .login-container button {
+        font-size: 14px;
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Phần đăng nhập -->
+  <div class="login-container" id="loginContainer">
+    <img src="https://cdn.shortpixel.ai/spai/q_lossy+ret_img+to_auto/linuxiac.com/wp-content/uploads/2022/03/ubuntu-logo.png" alt="Ubuntu Logo">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <div class="loading-message" id="loadingMessage">Vui lòng đợi, đang kết nối đến SSH console...</div>
+  </div>
+
+  <!-- Phần container cho terminal, htop và speedtest -->
+  <div class="container" id="container" style="display: none;">
+    <!-- Terminal -->
+    <div id="terminal-container"></div>
+
+    <!-- Htop container -->
+    <div id="htop-container">
+      <pre id="htop-output">Loading htop...</pre>
+    </div>
+
+    <!-- Speedtest container -->
+    <div id="speedtest-container">
+      <pre id="speedtest-output">Loading speedtest...</pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.js"></script>
+  <script>
+    let terminal; // Khai báo biến terminal toàn cục để chỉ khởi tạo sau khi login
+    let socket;
+
+    // Hàm khởi tạo terminal
+    function initializeTerminal() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const cols = Math.floor(width / 12);
+      const rows = Math.floor(height / 20);
+
+      terminal = new Terminal({
+        rows: rows,
+        cols: cols,
+        scrollback: 500,
+        theme: { background: '#282c34', foreground: '#fff' }
+      });
+
+      terminal.open(document.getElementById('terminal-container'));
+      socket = io();
+
+      terminal.onData(data => socket.emit('input', data));
+      socket.on('output', data => terminal.write(data));
+    }
+
+    // Hàm đăng nhập
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const loadingMessage = document.getElementById('loadingMessage');
+      loadingMessage.style.display = 'block';
+
+      if (username === 'negan' && password === 'negan') {
+        simulateLoginProcess();
+      } else {
+        setTimeout(() => {
+          loadingMessage.style.display = 'none';
+          alert('Thông tin đăng nhập không đúng!');
+        }, 3000);
+      }
+    }
+
+    function simulateLoginProcess() {
+      const steps = [
+        'Connecting to server Singapore SSH linuxuser@139.180.188.174 port 22...',
+        'Connection established Successfully.',
+        `Last login: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+      ];
+      const loadingMessage = document.getElementById('loadingMessage');
+
+      let i = 0;
+      loadingMessage.textContent = steps[i++];
+      setTimeout(() => { loadingMessage.textContent = steps[i++]; }, 2000);
+      setTimeout(() => { loadingMessage.textContent = steps[i++]; }, 4000);
+
+      setTimeout(() => {
+        loadingMessage.style.display = 'none';
+        document.getElementById('loginContainer').style.display = 'none'; // Ẩn phần đăng nhập
+        document.getElementById('container').style.display = 'flex'; // Hiển thị terminal và các bảng
+        initializeTerminal(); // Khởi tạo terminal
+        startHtop();  // Khởi tạo htop
+        startSpeedtest(); // Khởi tạo speedtest
+      }, 8000);
+    }
+
+    // Cập nhật lại terminal mỗi khi kích thước cửa sổ thay đổi
+    window.addEventListener('resize', function () {
+      if (terminal) {
+        terminal.resize(
+          Math.floor(window.innerWidth / 12),
+          Math.floor(window.innerHeight / 20)
+        );
+      }
     });
-    console.log('Thông báo đã gửi đến Telegram: ', response.data);
-  } catch (error) {
-    console.error('Lỗi khi gửi thông báo đến Telegram:', error);
-  }
-}
 
-// Quản lý các session đang hoạt động
-const sessions = {};
+    // Hàm chạy htop
+    function startHtop() {
+      setInterval(() => {
+        socket.emit('command', 'htop -b -n 1');
+      }, 5000); // Cập nhật htop mỗi 5 giây
+    }
 
-// Tạo session terminal khi người dùng kết nối
-io.on('connection', async (socket) => {
-  const userIp = socket.request.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
-  const ip = userIp.split(',')[0];
+    // Hàm chạy speedtest
+    function startSpeedtest() {
+      setInterval(() => {
+        socket.emit('command', 'speedtest-cli --simple');
+      }, 7000); // Cập nhật speedtest mỗi 7 giây
+    }
 
-  console.log(`User IP: ${ip}`);  // Log IP để kiểm tra
+  </script>
+</body>
 
-  const userLocation = await getUserLocation(ip);
-  const connectTime = moment().tz("Asia/Ho_Chi_Minh").format('YYYY-MM-DD HH:mm:ss');
-  
-  const connectMessage = `Một người dùng đã kết nối!\nIP: ${userLocation.ip}\nQuốc gia: ${userLocation.country}\nThành phố: ${userLocation.city}\nThời gian: ${connectTime}`;
-  console.log(connectMessage);
-
-  await sendToTelegram(connectMessage);
-
-  const sessionData = {
-    shell: pty.spawn(process.env.SHELL || '/bin/bash', [], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 30,
-      cwd: process.env.HOME,
-      env: process.env,
-    }),
-    connectTime: moment(),  
-    ip: ip,  
-    location: userLocation,  
-  };
-
-  sessions[socket.id] = sessionData;
-
-  // Lắng nghe đầu ra của terminal và truyền qua socket
-  sessionData.shell.on('data', (data) => {
-    socket.emit('output', data);
-  });
-
-  socket.on('input', (data) => {
-    sessionData.shell.write(data);
-  });
-
-  socket.on('command', (command) => {
-    sessionData.shell.write(`${command}\n`);
-  });
-
-  socket.on('disconnect', async () => {
-    const disconnectTime = moment().tz("Asia/Ho_Chi_Minh").format('YYYY-MM-DD HH:mm:ss');
-    const totalUsageTime = moment.duration(moment().diff(sessionData.connectTime));  
-
-    const disconnectMessage = `Một người dùng đã ngắt kết nối!\nIP: ${sessionData.ip}\nQuốc gia: ${sessionData.location.country}\nThành phố: ${sessionData.location.city}\nThời gian kết nối: ${sessionData.connectTime.format('YYYY-MM-DD HH:mm:ss')}\nThời gian ngắt kết nối: ${disconnectTime}\nTổng thời gian sử dụng terminal: ${totalUsageTime.humanize()}`;
-    console.log(disconnectMessage);
-
-    await sendToTelegram(disconnectMessage);
-
-    sessionData.shell.kill();
-    delete sessions[socket.id];  
-  });
-});
-
-// Lấy port từ môi trường hoặc mặc định port 3000
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`Server đang chạy trên http://localhost:${port}`);
-});
+</html>
